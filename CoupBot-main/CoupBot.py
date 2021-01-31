@@ -1,4 +1,5 @@
-
+#This is the main file for CoupBot, which runs the bot, connects to the Discord API, and houses some of the general-use commands of this server. 
+#More specific functions, such as those related to the coup event and stat logging, can be found in the cog folder. 
 import os
 import discord
 from discord.ext import commands
@@ -37,6 +38,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
 
+
 @bot.event
 async def on_ready():
     for guild in bot.guilds:
@@ -50,10 +52,6 @@ async def on_ready():
     await bot.change_presence(activity = discord.Activity(
                           type = discord.ActivityType.watching, 
                           name = 'old tyrants be deposed!'))
-
-    print("Current people in guild:")
-    members = '\n - '.join([member.name for member in guild.members])
-    print(f'Guild Members:\n - {members}')
 
 
 @commands.cooldown(1.0, 50, commands.BucketType.guild)
@@ -90,7 +88,7 @@ async def make_role(ctx):
 @commands.has_permissions(administrator = True)
 @bot.command(name = 'cleanslate')
 async def reset_roles(ctx):
-    #This should wipe the roles for the incumbent king. Essentially giving a fresh start to each reign in terms of permissions/roles.
+    #This will wipe the roles for the incumbent king. Essentially giving a fresh start to each reign in terms of permissions/roles.
     guild = ctx.guild
     kingRole = guild.get_role(KING_ROLE_ID) #"King" role's ID.
     botRole = guild.get_role(COUPBOT_ROLE_ID) #CoupBot's unique role ID.
@@ -101,6 +99,16 @@ async def reset_roles(ctx):
         if role.id != kingRole.id and role.id != botRole.id:
             await role.delete()
 
+@commands.has_permissions(administrator = True)
+@bot.command(name = 'rename')
+async def rename_bot(ctx):
+    #This will allow the king (or any admin) to rename the bot to whatever they want, provided it fits into Discord's 32-character limit.
+    message = ctx.message
+    #Here we're taking the message, slicing away the '!rename' part, and making the remaining 32 characters (if it goes up to that) the new name.
+    newName = message.content[8:40]
+    #Changing the bot's nickname.
+    await message.guild.me.edit(nick = newName)
+    print(f'Name changed to {newName}')
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -125,11 +133,6 @@ async def on_message_delete(message):
     #      print(f"A message was deleted by {deletedBy}.") 
 
 
-@bot.event
-async def on_member_ban(guild, user):
-#Not in use right now, but that should change later.
-    pass
-        
 
 bot.run(TOKEN)
 

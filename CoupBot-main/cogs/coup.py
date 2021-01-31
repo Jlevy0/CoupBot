@@ -1,3 +1,4 @@
+#This cog houses all methods related to the Coup feature of CoupBot.
 import os
 import discord
 from discord.ext import commands
@@ -23,7 +24,6 @@ class CoupCog(commands.Cog):
         self.bot = bot
         #Giving it an initial definition. votingEvent() can change that value.
         votingEventFlag = None
-        DataCog.sayWord(self)
 
 
 
@@ -48,6 +48,7 @@ class CoupCog(commands.Cog):
             elif votingEventFlag == False or None:
                 return False
 
+
     async def roleFreeze(self, ctx):
         #In the interest of making sure everyone is able to vote during the voting phase, permissions will
         # temporarily be changed such that all roles may see and react to posts, and posts/reactions cannot be removed.       
@@ -67,6 +68,7 @@ class CoupCog(commands.Cog):
 
         return permissionValues
 
+
     async def roleUnfreeze(self, ctx, permissionValues):
         #Returning our permissions to how they were pre-coup.
         guild = ctx.guild
@@ -78,6 +80,7 @@ class CoupCog(commands.Cog):
                 await r.edit(permissions = discord.Permissions(permissionValues[count]))
 
         return
+
 
     @commands.cooldown(1.0, 14400, commands.BucketType.guild)
     @commands.command(name= 'coup')
@@ -92,6 +95,10 @@ class CoupCog(commands.Cog):
 
         message = await channel.send(f"@here Should {king} be deposed?")
 
+        #Logging this coup attempt to a csv.
+        DataCog.coupAttempts(self, ctx, king)
+        print(message.content, message.id)
+        #Restricting permissions while a vote is going on to prevent political skullduggery.
         self.votingEvent('MakeTrue')
 
         for emoji in ('✅', '❎'): #Gotta find the text version of the emoji and paste it in here like so if you wanna do it this way. codepoints.net gives them
@@ -103,7 +110,8 @@ class CoupCog(commands.Cog):
         #Variables to hold the number of votes. 
         yay = 0
         nay = 0 
-        message = await message.channel.fetch_message(message.id) #Refreshes the message to include reaction information
+        
+        message = await message.channel.fetch_message(message.id) #Refreshes the message to include reaction 
 
         for reaction in message.reactions:
             if reaction.emoji == '✅':
@@ -143,10 +151,13 @@ class CoupCog(commands.Cog):
         #Now that we have our leader, we can add the role and inform the server of their ascension.
         await chosenKing.add_roles(role)
         await channel.send(f'{chosenKing.mention} IS OUR NEW LEADER!')
-        await channel.send("LONG LIVE THE KING")
+        message = await channel.send("LONG LIVE THE KING")
 
+        #Logging this successful coup.
+        DataCog.successfulCoup(self, message, chosenKing)
         #Fixing roles to how they were pre-coup
         await self.roleUnfreeze(ctx, permissionValues)
+
 
     #Tracking what member leaves. If the king leaves, it automatically coups.
     @commands.Cog.listener()
@@ -161,7 +172,8 @@ class CoupCog(commands.Cog):
                 ctx = (await self.bot.get_context(message))
                 await self.coup(ctx, None)
 
-#Sometimes the leader may want to give up their position. This command will allow them to do so.
+
+    #Sometimes the leader may want to give up their position. This command will allow them to do so.
     @commands.command(name= 'abdicate')
     async def abdicate(self, ctx):
         member = ctx.author
@@ -174,7 +186,6 @@ class CoupCog(commands.Cog):
             if kingRole.id == role.id:
                 await announcementChannel.send("The king has abdicated his position! He shall be replaced!")
                 await self.coup(ctx, None)
-
 
 
 def setup(bot):
