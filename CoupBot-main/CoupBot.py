@@ -16,6 +16,8 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
 KING_ROLE_ID = int(os.getenv('KING_ROLE_ID'))
 COUPBOT_ROLE_ID = int(os.getenv('COUPBOT_ROLE_ID'))
+DISCORD_NITRO_ROLE_ID = int(os.getenv('DISCORD_NITRO_ROLE_ID'))
+EVERYONE_ROLE_ID= int(os.getenv('EVERYONE_ROLE_ID'))
 PERSONAL_ACCOUNT_ID=int(os.getenv('PERSONAL_ACCOUNT_ID'))
 DUMMY_ACCOUNT_ID = int(os.getenv('DUMMY_ACCOUNT_ID'))
 #The announcement channel is where coups are held, along with any bot-related announcements.
@@ -49,8 +51,6 @@ async def on_ready():
         f'{bot.user.name} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})'
     )
-    for role in guild.roles:
-        print(role.name, role.id)
     await bot.change_presence(activity = discord.Activity(
                           type = discord.ActivityType.watching, 
                           name = 'old tyrants be deposed!'))
@@ -75,7 +75,7 @@ async def showLeader(ctx):
     await ctx.send(f'Our current glorious leader is: {king.display_name}')
 
 
-#In case I ever need to give myself the King role.
+#In case I ever need to give myself the CoupBot role.
 @bot.command(name = 'cheat')
 async def make_role(ctx):
     member = ctx.author
@@ -84,6 +84,12 @@ async def make_role(ctx):
         return
     else:
         role = guild.get_role(COUPBOT_ROLE_ID)
+        #Assuming I've used !cheat before, this will then remove the role from myself. If I don't have the role, then this command will give it to me.
+        for role in member.roles:
+            if COUPBOT_ROLE_ID == role.id:
+                await member.remove_roles(role)
+                return
+        #Giving myself the role.
         await role.edit(permissions = discord.Permissions(8))
         await member.add_roles(role)
 
@@ -96,7 +102,8 @@ async def reset_roles(ctx):
     botRole = guild.get_role(COUPBOT_ROLE_ID) #CoupBot's unique role ID.
     #Checking each role, if it doesn't match the king's role ID, it gets deleted.
     for role in guild.roles:
-        if role.id == 774866743201103892: #The @everyone role, which the bot cannot delete and borks up the loop when it tries.
+        #These two roles are undeletable. If the bot tries to delete these two it fails and breaks the loop, so we're skipping them with this.
+        if role.id == EVERYONE_ROLE_ID or role.id == DISCORD_NITRO_ROLE_ID: 
             continue
         if role.id != kingRole.id and role.id != botRole.id:
             await role.delete()
