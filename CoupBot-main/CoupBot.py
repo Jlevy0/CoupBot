@@ -49,6 +49,8 @@ async def on_ready():
         f'{bot.user.name} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})'
     )
+    for role in guild.roles:
+        print(role.name, role.id)
     await bot.change_presence(activity = discord.Activity(
                           type = discord.ActivityType.watching, 
                           name = 'old tyrants be deposed!'))
