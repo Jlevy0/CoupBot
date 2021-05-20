@@ -90,6 +90,7 @@ class DataCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel):
+        #This will log when a channel is created, as well as some details about it such as its unique ID and its type (Voice/Text).
         with open('coupbot_channels.csv', 'a') as csvfile:
             fieldnames = ['channel_name', 'channel_id', 'channel_type']
             writer = csv.DictWriter(csvfile, 
