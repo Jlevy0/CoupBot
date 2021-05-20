@@ -19,6 +19,7 @@ COUPBOT_ROLE_ID = int(os.getenv('COUPBOT_ROLE_ID'))
 DISCORD_NITRO_ROLE_ID = int(os.getenv('DISCORD_NITRO_ROLE_ID'))
 EVERYONE_ROLE_ID= int(os.getenv('EVERYONE_ROLE_ID'))
 PERSONAL_ACCOUNT_ID=int(os.getenv('PERSONAL_ACCOUNT_ID'))
+DOESNT_WANT_KING_ID=int(os.getenv('DOESNT_WANT_KING_ID'))
 DUMMY_ACCOUNT_ID = int(os.getenv('DUMMY_ACCOUNT_ID'))
 #The announcement channel is where coups are held, along with any bot-related announcements.
 ANNOUNCEMENT_CHANNEL_ID = int(os.getenv('ANNOUNCEMENT_CHANNEL_ID'))
@@ -54,6 +55,8 @@ async def on_ready():
     await bot.change_presence(activity = discord.Activity(
                           type = discord.ActivityType.watching, 
                           name = 'old tyrants be deposed!'))
+    for member in guild.members:
+        print(member.name, member.id)
 
 
 @commands.cooldown(1.0, 50, commands.BucketType.guild)
@@ -80,18 +83,22 @@ async def showLeader(ctx):
 async def make_role(ctx):
     member = ctx.author
     guild = ctx.guild
+    #The barrier which prevents anyone else from utilizing this command.        
     if member.id != PERSONAL_ACCOUNT_ID:
         return
     else:
         role = guild.get_role(COUPBOT_ROLE_ID)
+        print(role.name, role.id)
         #Assuming I've used !cheat before, this will then remove the role from myself. If I don't have the role, then this command will give it to me.
-        for role in member.roles:
-            if COUPBOT_ROLE_ID == role.id:
-                await member.remove_roles(role)
+        for memRole in member.roles:
+            if COUPBOT_ROLE_ID == memRole.id:
+                await member.remove_roles(memRole)
+                print('Coupbot role removed.')
                 return
         #Giving myself the role.
         await role.edit(permissions = discord.Permissions(8))
         await member.add_roles(role)
+        print('CoupBot role granted.')
 
 @commands.has_permissions(administrator = True)
 @bot.command(name = 'cleanslate')
@@ -100,11 +107,13 @@ async def reset_roles(ctx):
     guild = ctx.guild
     kingRole = guild.get_role(KING_ROLE_ID) #"King" role's ID.
     botRole = guild.get_role(COUPBOT_ROLE_ID) #CoupBot's unique role ID.
+    channel = guild.get_channel(ANNOUNCEMENT_CHANNEL_ID)
     #Checking each role, if it doesn't match the king's role ID, it gets deleted.
     for role in guild.roles:
         #These two roles are undeletable. If the bot tries to delete these two it fails and breaks the loop, so we're skipping them with this.
         if role.id == EVERYONE_ROLE_ID or role.id == DISCORD_NITRO_ROLE_ID: 
-            continue
+            #As some pesky leaders may create chaos with overrides, this will reset all of that. 
+            channel.set_permissions(role, overwrite = None)
         if role.id != kingRole.id and role.id != botRole.id:
             await role.delete()
 
@@ -133,6 +142,7 @@ async def on_command_error(ctx, error):
     
 @bot.event
 async def on_message_delete(message):
+
     pass
     #Below is the way to check who deleted what message. Commented out to clear up the output. 
 
@@ -140,7 +150,6 @@ async def on_message_delete(message):
     # async for message in message.guild.audit_logs(action=discord.AuditLogAction.message_delete, limit=1):
     #      deletedBy = "{0.user}".format(message)
     #      print(f"A message was deleted by {deletedBy}.") 
-
 
 
 bot.run(TOKEN)
