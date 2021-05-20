@@ -14,6 +14,7 @@ GUILD = os.getenv('DISCORD_GUILD')
 KING_ROLE_ID = int(os.getenv('KING_ROLE_ID'))
 COUPBOT_ROLE_ID = int(os.getenv('COUPBOT_ROLE_ID'))
 PERSONAL_ACCOUNT_ID=int(os.getenv('PERSONAL_ACCOUNT_ID'))
+DOESNT_WANT_KING_ID=int(os.getenv('DOESNT_WANT_KING_ID'))
 DUMMY_ACCOUNT_ID = int(os.getenv('DUMMY_ACCOUNT_ID'))
 #The announcement channel is where coups are held, along with any bot-related announcements.
 ANNOUNCEMENT_CHANNEL_ID = int(os.getenv('ANNOUNCEMENT_CHANNEL_ID'))
@@ -53,31 +54,40 @@ class CoupCog(commands.Cog):
         #In the interest of making sure everyone is able to vote during the voting phase, permissions will
         # temporarily be changed such that all roles may see and react to posts, and posts/reactions cannot be removed.       
         guild = ctx.guild
+        channel = guild.get_channel(ANNOUNCEMENT_CHANNEL_ID)
+        overwriteValues = channel.overwrites
+        
         #All pre-coup permissions will be saved in a list of permission values and re-instated with it.
         permissionValues = []
+        overwriteValues = []
         for r in guild.roles:
             #A list of every permission for each role. 
             #See https://discordapi.com/permissions.html#268435624 for an idea as to what the role values look like.
     
             permissionValues.append(r.permissions.value)
         
+            overwriteValues.append(channel.overwrites_for(r))
             #36818624 gives the ability to read and send posts as well as and add reactions to each role. 
             #It also removes admin abilities.
             #Remember to use discord.Permissions() if you're going to utilize this. 
             await r.edit(permissions = discord.Permissions(36818624), reason = 'Roles temporarily changed during voting period.')
+            await channel.set_permissions(r, overwrite = None)
 
-        return permissionValues
+        return permissionValues, overwriteValues
 
 
-    async def roleUnfreeze(self, ctx, permissionValues):
+    async def roleUnfreeze(self, ctx, permissionValues, overwriteValues):
         #Returning our permissions to how they were pre-coup.
         guild = ctx.guild
+        channel = guild.get_channel(ANNOUNCEMENT_CHANNEL_ID)
         #In the cases where the king abdicates or leaves, we may not have any generated Permission values, in which case we can just skip them.
         if permissionValues == None:
             return
         else:
             for count, r in enumerate(guild.roles):
                 await r.edit(permissions = discord.Permissions(permissionValues[count]))
+            #Resetting the channel overwrites to how they were pre-voting.
+            await channel.edit(r, overwrites=overwriteValues[count])
 
         return
 
@@ -91,7 +101,7 @@ class CoupCog(commands.Cog):
         role = guild.get_role(KING_ROLE_ID) #"King" role's ID.
         king = role.members[0]
 
-        permissionValues = await self.roleFreeze(ctx)
+        permissionValues, overwriteValues = await self.roleFreeze(ctx)
 
         message = await channel.send(f"@here Should {king} be deposed?")
 
@@ -122,14 +132,14 @@ class CoupCog(commands.Cog):
         print(f'The votes for yay are {yay}, the votes for nay are {nay}.')
         #Nay votes subtract from the yay votes, we need at least 3 yay votes for the coup to be successful. 
         if (yay - nay) >= 3:
-            await self.coup(ctx, permissionValues)
+            await self.coup(ctx, permissionValues, overwriteValues)
         else:
             await channel.send("The current leader remains! Long live the king!")
             self.votingEvent('MakeFalse')
-            await self.roleUnfreeze(ctx, permissionValues)
+            await self.roleUnfreeze(ctx, permissionValues, overwriteValues)
 
 
-    async def coup(self, ctx, permissionValues):
+    async def coup(self, ctx, permissionValues, overwriteValues):
         guild = ctx.guild
         channel = guild.get_channel(ANNOUNCEMENT_CHANNEL_ID)
         role = guild.get_role(KING_ROLE_ID) #"King" role's ID.
@@ -142,10 +152,11 @@ class CoupCog(commands.Cog):
         await channel.send("*DECIDING NEW LEADER...*")
         await asyncio.sleep(10)
 
-        #The namesake of this project: We'll now pick a random member - minus my spare account - to make as our leader.
+        #The namesake of this project: We'll now pick a random member - minus my spare account and those that don't want the role - to make as our leader.
         guildRoster = guild.members
+        willNotBeLeader = [DOESNT_WANT_KING_ID, DUMMY_ACCOUNT_ID]
         for member in guildRoster:
-            if member.id == DUMMY_ACCOUNT_ID:
+            if member.id in willNotBeLeader:
                 guildRoster.remove(member)
         chosenKing = random.choice(guildRoster)
         #Now that we have our leader, we can add the role and inform the server of their ascension.
@@ -156,7 +167,7 @@ class CoupCog(commands.Cog):
         #Logging this successful coup.
         DataCog.successfulCoup(self, message, chosenKing)
         #Fixing roles to how they were pre-coup
-        await self.roleUnfreeze(ctx, permissionValues)
+        await self.roleUnfreeze(ctx, permissionValues, overwriteValues)
 
 
     #Tracking what member leaves. If the king leaves, it automatically coups.
